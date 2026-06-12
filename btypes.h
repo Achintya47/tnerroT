@@ -1,12 +1,6 @@
 #ifndef BTYPES_H
 #define BTYPES_H
 
-
-/* CHOICE OF MAKING STRUCTS FOR INTEGERS, STRINGS WAS DONE TO CREATE CONSISTENCY,
-ALLL DEALINGS WILL NOW BE DONE USING BVALUE, FUNCTION DEFINITIONS WILL NOW LOOK CONSISTENT,
-ACCEPTING BVALUE AND ERROR/TYPE CHECKING WILL BE DONE INSIDE.
-THIS WAS ALOS DONE BECAUSE OF ADDING HETEROGENOUS LISTS AND DICTIONARIES*/
-
 typedef struct BValue BValue;
 
 typedef struct {
@@ -63,8 +57,6 @@ BValue* list_get(BValue* list, int index);
 void dict_insert(BValue* dict, const char* key, int key_length, BValue* value);
 BValue* dict_get(BValue* dict, const char* key, int key_length);
 void destroy_value(BValue* value);
-
-
 
 
 #endif
