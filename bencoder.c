@@ -1,15 +1,26 @@
+/**
+ * @authors : @Achintya47, @loki533
+ * @date : 12/06/2026
+ * @brief : Bencoding is a way to specify and organize data in a terse format. 
+ * It supports the following types: byte strings, integers, lists, and dictionaries.
+ * @details : Bencoding Specifications
+ * 1. Byte strings are encoded as follows: <string length encoded in base ten ASCII>:<string data>
+ * 2. Integers are encoded as follows: i<integer encoded in base ten ASCII>e
+ *      The initial i and trailing e are beginning and ending delimiters.
+ * 3. Lists are encoded as follows: l<bencoded values>e
+ *      The initial l and trailing e are beginning and ending delimiters. 
+ *      Lists may contain any bencoded type, including integers, strings, dictionaries, 
+ *      and even lists within other lists.  
+ * 4. Dictionaries are encoded as follows: d<bencoded string><bencoded element>e
+ *      The initial d and trailing e are the beginning and ending delimiters. Note that the keys must be bencoded strings.
+ * @cite : https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "btypes.h"
 
-
-/* We don't really need the encoded strings, ofcourse we need it for
-error checking and testing the bencoders, but we can do that while implementing the actual logic.
-Actual Logic : Would be to write the encoded strings in a file/stream, further while decoding as well, they 
-take input from a file stream, this way it is more standardised and we can moove forward with torrent files.*/
-
-// ALSO REDUCES ALLOCATION OVERHEAD, FILE* HANDLES BUFFER
 void encode_value(FILE* out, const BValue* value);
 void encode_int(FILE* out, const BValue* value);
 void encode_string(FILE* out, const BValue* value);
