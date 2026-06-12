@@ -1,9 +1,9 @@
 /**
- * @authors : @Achintya47, @loki533
- * @date : 12/06/2026
- * @brief : Bencoding is a way to specify and organize data in a terse format. 
+ * @authors     : @Achintya47, @loki533
+ * @date        : 12/06/2026
+ * @brief       : Bencoding is a way to specify and organize data in a terse format. 
  * It supports the following types: byte strings, integers, lists, and dictionaries.
- * @details : Bencoding Specifications
+ * @details      : Bencoding Specifications
  * 1. Byte strings are encoded as follows: <string length encoded in base ten ASCII>:<string data>
  * 2. Integers are encoded as follows: i<integer encoded in base ten ASCII>e
  *      The initial i and trailing e are beginning and ending delimiters.
@@ -13,7 +13,10 @@
  *      and even lists within other lists.  
  * 4. Dictionaries are encoded as follows: d<bencoded string><bencoded element>e
  *      The initial d and trailing e are the beginning and ending delimiters. Note that the keys must be bencoded strings.
- * @cite : https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure
+ * @note        : For Bit-Torrent, dictionaries are the most important as the .torrent file contains the info-dict
+ *              which is necessary for establishing connection and further downloading and verifying pieces.
+ *              Thus for easy retrieval, dictionaries are maintained in sorted order.
+ * @cite        : https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure
  */
 
 #include <stdio.h>

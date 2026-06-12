@@ -1,12 +1,11 @@
 /**
  * @authors : @Achintya47, @loki533
- * @date : 12/06/2026
- * @brief : Standard BitTorrent protocol has four major data types, integers, strings, lists and dictionaries.
+ * @date 	: 12/06/2026
+ * @brief 	: Standard BitTorrent protocol has four major data types, integers, strings, lists and dictionaries.
  * 			All are standard datatypes, Lists are heterogenous, thus BValue datatype was created.
  * 			Further, for consistency and simple function headers, integers (int num) and strings (char* str) were also
  * 			wrapped inside BValue objects, thus this here was a tradeoff, a slight complex design was choose, for developer ease.
  */
-
 
 #include "btypes.h"
 #include <stdio.h>
