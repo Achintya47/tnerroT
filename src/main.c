@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "include/btypes.h"
-#include "include/torrent.h"
-#include "include/bencoder.h"
+#include "btypes.h"
+#include "torrent.h"
+#include "bencoder.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

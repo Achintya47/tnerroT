@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "include/btypes.h"
+#include "btypes.h"
 
 void encode_value(FILE* out, const BValue* value);
 void encode_int(FILE* out, const BValue* value);

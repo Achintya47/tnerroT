@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "include/bencoder.h"
+#include "bencoder.h"
 
 /**
  * @brief Integers Encoding function, i<integer encoded in base ten ASCII>e

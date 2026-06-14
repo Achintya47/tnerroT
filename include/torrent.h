@@ -9,7 +9,7 @@
 #define TORRENT_H
 
 #include <stdint.h>
-#include "include/btypes.h"
+#include "btypes.h"
 
 
 // Allocated as : torrent.piece_length / 20 and thus, piece hash

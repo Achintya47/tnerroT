@@ -1,5 +1,5 @@
-#include "include/btypes.h"
-#include "include/torrent.h"
+#include "btypes.h"
+#include "torrent.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
