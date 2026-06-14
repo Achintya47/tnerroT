@@ -26,7 +26,7 @@ jobs:
           sudo apt-get install -y build-essential
 
       - name: Build Project
-        run: gcc src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
+        run: gcc -Iinclude src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
       
       - name : Run a Torrnt parse
         run: ./tnerroT big-buck-bunny.torrent
