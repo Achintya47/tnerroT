@@ -1,0 +1,35 @@
+
+name: C CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Build Project
+        run: gcc src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
+
+      - name: Provide privileges
+        run: chmod +x tnerroT
+      
+      - name : Run a Torrnt parse
+        run: tnerroT big-buck-bunny.torrent
