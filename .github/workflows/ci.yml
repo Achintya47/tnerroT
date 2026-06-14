@@ -28,5 +28,22 @@ jobs:
       - name: Build Project
         run: gcc -Iinclude src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
       
+        # MAIN BINARY - SMOKE TESTING
       - name : Run a Torrnt parse
         run: ./tnerroT big-buck-bunny.torrent
+
+        # BENCODER TESTS
+      - name : Build Bencoder Tests
+        run : gcc -Iinclude -Itest src/bencoder.c src/btypes.c test/test_bencoder.c -o test_bencoder
+
+      - name : Run Bencoder Tests
+        run : ./test_bencoder
+
+        # TORRENT PARSER TESTS
+      - name : Build Torrent Tests
+        run : gcc -Iinclude -Itest src/bencoder.c src/btypes.c src/torrent.c test/test_torrent.c -o test_torrent
+      
+      - name : Run Torrent Tests
+        run : ./test_torrent big-buck-bunny.torrent
+
+
