@@ -34,6 +34,9 @@ static char* copy_bstring(BValue* str) {
 
 
 Torrent *torrent_parse(BValue *root) {
+    
+    torrent->info_dict = info; /* saving info dict for peer discovery */
+    
     if (!root || root->type != BDICT)
         return NULL;
 
