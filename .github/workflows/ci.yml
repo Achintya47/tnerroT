@@ -26,7 +26,7 @@ jobs:
           sudo apt-get install -y build-essential
 
       - name: Build Project
-        run: gcc -Iinclude src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
+        run: gcc -Wall -Werror -Wextra -Iinclude src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
       
         # MAIN BINARY - SMOKE TESTING
       - name : Run a Torrnt parse
