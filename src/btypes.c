@@ -7,7 +7,7 @@
  * 			wrapped inside BValue objects, thus this here was a tradeoff, a slight complex design was choose, for developer ease.
  */
 
-#include "btypes.h"
+#include "include/btypes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -5,7 +5,11 @@
  * @cite    : https://wiki.theory.org/BitTorrentSpecification#Info_Dictionary
  */
 
+#ifndef TORRENT_H
+#define TORRENT_H
+
 #include <cstdint>
+#include "include/btypes.h"
 
 
 // Allocated as : torrent.piece_length / 20 and thus, piece hash
@@ -58,3 +62,5 @@ typedef struct {
 
 } Torrent;
 
+
+#endif
