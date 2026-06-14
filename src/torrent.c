@@ -136,9 +136,6 @@ Torrent *torrent_parse(BValue *root) {
     return torrent;
 }
 
-static void print_piece_hash(const PieceHash* hash) {
-    
-}
 
 void torrent_print(const Torrent* torrent) {
     if (!torrent)
