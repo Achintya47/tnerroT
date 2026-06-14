@@ -101,9 +101,13 @@ void list_append(BValue* list, BValue* item) {
 	if (l->count == l->capacity) {
 		l->capacity *= 2;
 
+		/*
+		BUG FIX : reallocating BValue instead of BValue*, as items
+		is a BValue** pointer
+		*/
 		l->items = realloc(
 			l->items, 
-			sizeof(BValue) * l->capacity
+			sizeof(BValue*) * l->capacity
 		);
 	}
 
@@ -121,7 +125,10 @@ BValue* list_get(BValue* list, int index) {
 	
 	BList* l = &list->value.list;
 
-	if (index < 0 || index > l->count)
+	/*
+	BUG FIX : index > l->count , thus case of index == l->count will be missed 
+	*/
+	if (index < 0 || index >= l->count)
 		return NULL;
 	
 	return l->items[index];

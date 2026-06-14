@@ -3,6 +3,7 @@
 
 #include "include/btypes.h"
 #include "include/torrent.h"
+#include "include/bencoder.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -21,6 +22,7 @@ int main(int argc, char* argv[]) {
     fclose(fp);
 
     if (!root) {
+        destroy_value(root);
         fprintf(stderr, "Failed to decode torrent file\n");
         return EXIT_FAILURE;
     }
@@ -28,6 +30,15 @@ int main(int argc, char* argv[]) {
     Torrent* torrent = torrent_parse(root);
 
     if (!torrent) {
+        destroy_value(root);
+        torrent_destroy(torrent);
         fprintf(stderr, "Failed to parse torrent metadata\n");
     }
+
+    torrent_print(torrent);
+    
+    destroy_value(root);
+    torrent_destroy(torrent);
+
+    return 0;
 }

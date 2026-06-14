@@ -8,7 +8,7 @@
 #ifndef TORRENT_H
 #define TORRENT_H
 
-#include <cstdint>
+#include <stdint.h>
 #include "include/btypes.h"
 
 
@@ -33,6 +33,12 @@ typedef struct {
 
     // Lenght of the file in bytes
     uint64_t length;
+
+    // 
+
+    /* EXTRA ADDED PARAMETERS */
+
+    uint64_t num_pieces;
 
     /* OPTIONAL PARAMETERS */
 
@@ -61,6 +67,10 @@ typedef struct {
     uint64_t is_private; 
 
 } Torrent;
+
+Torrent* torrent_parse(BValue* root);
+void torrent_destroy(Torrent *torrent);
+void torrent_print(const Torrent* torrent);
 
 
 #endif

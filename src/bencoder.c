@@ -163,6 +163,12 @@ BValue* decode_int(FILE* in) {
         if (c == EOF)
             return NULL;
 
+        /*
+        BUG FIX : Buffer Overflow risk, thus buffer index validation
+        */
+        if (pos >= (int)sizeof(buffer)-1)
+            return NULL;
+
         buffer[pos++] = (char)c;
     }
 
@@ -187,13 +193,27 @@ BValue* decode_string(FILE* in, int first_digit) {
     {
         if (c == EOF)
             return NULL;
+        
+        /*
+        BUG FIX : Protecting against malformed input
+        Example : 4a:spam, here without validation, 'a' will be evaluated
+        and 'a' - '0' will yield and accumulate in the length
+        */
+        if (c < '0' || c > '9')
+            return NULL;
 
         length = length * 10 + (c - '0');
     }
 
     char* buffer = malloc(length);
 
-    fread(buffer, 1, length, in);
+    /*
+    BUG FIX : File reading issue
+    */
+    if (fread(buffer, 1, length, in) != (size_t)length) {
+        free(buffer);
+        return NULL;
+    }
 
     BValue* value =
         create_string(buffer, length);
