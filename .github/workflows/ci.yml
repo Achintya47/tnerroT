@@ -27,9 +27,6 @@ jobs:
 
       - name: Build Project
         run: gcc src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
-
-      - name: Provide privileges
-        run: chmod +x tnerroT
       
       - name : Run a Torrnt parse
-        run: tnerroT big-buck-bunny.torrent
+        run: ./tnerroT big-buck-bunny.torrent
