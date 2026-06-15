@@ -1,9 +1,9 @@
 /**
- * @authors : @Achintya47, @loki533
- * @date : 12/06/2026
- * @brief : Bencoding is a way to specify and organize data in a terse format. 
+ * @authors     : @Achintya47, @loki533
+ * @date        : 12/06/2026
+ * @brief       : Bencoding is a way to specify and organize data in a terse format. 
  * It supports the following types: byte strings, integers, lists, and dictionaries.
- * @details : Bencoding Specifications
+ * @details      : Bencoding Specifications
  * 1. Byte strings are encoded as follows: <string length encoded in base ten ASCII>:<string data>
  * 2. Integers are encoded as follows: i<integer encoded in base ten ASCII>e
  *      The initial i and trailing e are beginning and ending delimiters.
@@ -13,20 +13,16 @@
  *      and even lists within other lists.  
  * 4. Dictionaries are encoded as follows: d<bencoded string><bencoded element>e
  *      The initial d and trailing e are the beginning and ending delimiters. Note that the keys must be bencoded strings.
- * @cite : https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure
+ * @note        : For Bit-Torrent, dictionaries are the most important as the .torrent file contains the info-dict
+ *              which is necessary for establishing connection and further downloading and verifying pieces.
+ *              Thus for easy retrieval, dictionaries are maintained in sorted order.
+ * @cite        : https://wiki.theory.org/BitTorrentSpecification#Metainfo_File_Structure
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "btypes.h"
-
-void encode_value(FILE* out, const BValue* value);
-void encode_int(FILE* out, const BValue* value);
-void encode_string(FILE* out, const BValue* value);
-void encode_list(FILE* out, const BValue* value);
-void encode_dict(FILE* out, const BValue* value);
-
+#include "bencoder.h"
 
 /**
  * @brief Integers Encoding function, i<integer encoded in base ten ASCII>e
@@ -124,12 +120,6 @@ void encode_value(FILE* out, const BValue* value)
 
 /* IMPLEMENTING DECODERS */
 
-BValue* decode_value(FILE* in);
-
-BValue* decode_int(FILE* in);
-BValue* decode_string(FILE* in, int first_digit);
-BValue* decode_list(FILE* in);
-BValue* decode_dict(FILE* in);
 
 /**
  * @brief Distributer Function, calls object based decoders
@@ -173,6 +163,12 @@ BValue* decode_int(FILE* in) {
         if (c == EOF)
             return NULL;
 
+        /*
+        BUG FIX : Buffer Overflow risk, thus buffer index validation
+        */
+        if (pos >= (int)sizeof(buffer)-1)
+            return NULL;
+
         buffer[pos++] = (char)c;
     }
 
@@ -197,13 +193,27 @@ BValue* decode_string(FILE* in, int first_digit) {
     {
         if (c == EOF)
             return NULL;
+        
+        /*
+        BUG FIX : Protecting against malformed input
+        Example : 4a:spam, here without validation, 'a' will be evaluated
+        and 'a' - '0' will yield and accumulate in the length
+        */
+        if (c < '0' || c > '9')
+            return NULL;
 
         length = length * 10 + (c - '0');
     }
 
     char* buffer = malloc(length);
 
-    fread(buffer, 1, length, in);
+    /*
+    BUG FIX : File reading issue
+    */
+    if (fread(buffer, 1, length, in) != (size_t)length) {
+        free(buffer);
+        return NULL;
+    }
 
     BValue* value =
         create_string(buffer, length);
