@@ -66,6 +66,7 @@ typedef struct {
     // e.g. PEX peer exchange, dht. Here, "private" may be read as "no external peer source".
     uint64_t is_private; 
 
+    unsigned char info_hash[20]; /*peer discovery*/
 } Torrent;
 
 Torrent* torrent_parse(BValue* root);
