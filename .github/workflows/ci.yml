@@ -14,7 +14,13 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    strategy: 
+      fail-fast : false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+  
     steps:
 
       - name: Checkout Repository
@@ -23,10 +29,19 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y build-essential clang
 
-      - name: Build Project with compiler warnings and GCC runtime checkers
-        run: gcc -Wall -Werror -Wextra -fsanitize=address,undefined -Iinclude src/bencoder.c src/btypes.c src/main.c src/torrent.c -o tnerroT
+      - name: Build Project with warnings and sanitizers
+        run: |
+          ${{ matrix.compiler }} \
+            -Wall -Wextra -Werror \
+            -fsanitize=address,undefined \
+            -Iinclude \
+            src/bencoder.c \
+            src/btypes.c \
+            src/main.c \
+            src/torrent.c \
+            -o tnerroT
       
         # MAIN BINARY - SMOKE TESTING
       - name : Run a Torrnt parse
@@ -45,5 +60,3 @@ jobs:
       
       - name : Run Torrent Tests
         run : ./test_torrent big-buck-bunny.torrent
-
-
