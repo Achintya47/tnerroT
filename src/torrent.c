@@ -86,14 +86,45 @@ Torrent *torrent_parse(BValue *root) {
 
         BList* list = &files->value.list;
 
+        torrent->num_files = list->count;
+        torrent->files = calloc(list->count, sizeof(TorrentFile));
+            
+        uint64_t total = 0;
+
         for (int i = 0; i < list->count; i++) {
             BValue* file_dict = list->items[i];
 
             BValue* file_length =
                 dict_get(file_dict, "length", 6);
+            
+            BValue* path = 
+                dict_get(file_dict, "path", 4);
+            
+            if (!file_length || !path)
+                continue;
 
-            if (file_length)
-                total += file_length->value.integer.value;
+            TorrentFile* tf = &torrent->files[i];
+
+            tf->length = file_length->value.integer.value;
+            total += tf->length;
+
+            BList* path_list = &path->value.list;
+
+            tf->path_count = path_list->count;
+            tf->path = calloc(path_list->count, sizeof(char*));
+
+            for (int j = 0; j < path_list->count; j++) {
+                BValue* component = path_list->items[j];
+
+                tf->path[j] = strdup(component->value.string.data);
+            }
+
+            BValue* md5 =
+                dict_get(file_dict, "md5sum", 6);
+
+            if (md5)
+                tf->md5sum = strdup(md5->value.string.data);
+
         }
 
         torrent->length = total;

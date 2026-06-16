@@ -19,6 +19,26 @@ typedef struct {
 } PieceHash;
 
 typedef struct {
+    // Length of the file in bytes
+    uint64_t length;
+
+    // a list containing one or more string elements that together 
+    // represent the path and filename. Each element in the list corresponds 
+    // to either a directory name or (in the case of the final element) the filename.
+    // For example, a the file "dir1/dir2/file.ext" would consist of three string 
+    // elements: "dir1", "dir2", and "file.ext".
+    char** path;
+    // Number of path components
+    uint64_t path_count;
+
+    /* OPTIONAL PARAMETERS */
+    char* md5sum;
+
+} TorrentFile;
+
+
+typedef struct {
+
     // The announce URL of the tracker
     char* announce;
 
@@ -31,12 +51,14 @@ typedef struct {
     // The filename
     char* name;
 
-    // Lenght of the file in bytes
+    // Length of the file in bytes
     uint64_t length;
 
-    // 
+    // Multi-File Mode (More common)
+    TorrentFile* files;
+    uint64_t num_files;
 
-    /* EXTRA ADDED PARAMETERS */
+    /* EXTRA ADDED PARAMETERS BY ME */
 
     uint64_t num_pieces;
 
