@@ -82,7 +82,6 @@ Torrent *torrent_parse(BValue *root) {
             length->value.integer.value;
     }
     else if (files) {
-        uint64_t total = 0;
 
         BList* list = &files->value.list;
 
@@ -166,6 +165,7 @@ Torrent *torrent_parse(BValue *root) {
 
     return torrent;
 }
+
 
 
 void torrent_print(const Torrent* torrent) {

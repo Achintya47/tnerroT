@@ -39,8 +39,7 @@ void encode_int(FILE* out, const BValue* value)
  * @param FILE* stream object, BValue* object
  * @return void
  */
-void encode_string(FILE* out, const BValue* value)
-{
+void encode_string(FILE* out, const BValue* value) {
     const BString* str = &value->value.string;
 
     fprintf(out, "%d:", str->length);
