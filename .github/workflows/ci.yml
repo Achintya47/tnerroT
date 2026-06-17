@@ -37,6 +37,7 @@ jobs:
             -Wall -Wextra -Werror \
             -fsanitize=address,undefined \
             -Iinclude \
+            utils/sha1.c \
             src/bencoder.c \
             src/btypes.c \
             src/main.c \
@@ -56,7 +57,7 @@ jobs:
 
         # TORRENT PARSER TESTS
       - name : Build Torrent Tests
-        run : gcc -Iinclude -Itests src/bencoder.c src/btypes.c src/torrent.c tests/test_torrent.c -o test_torrent
+        run : gcc -Iinclude -Itests src/bencoder.c src/btypes.c src/torrent.c utils/sha1.c tests/test_torrent.c -o test_torrent
       
       - name : Run Torrent Tests
         run : ./test_torrent big-buck-bunny.torrent
