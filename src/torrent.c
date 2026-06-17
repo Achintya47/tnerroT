@@ -1,8 +1,10 @@
-#include "btypes.h"
-#include "torrent.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "btypes.h"
+#include "torrent.h"
+#include "sha1.h"
 
 
 #define FAIL(msg) do { \
@@ -45,6 +47,8 @@ Torrent *torrent_parse(BValue *root) {
     BValue *announce =
         dict_get(root, "announce", 8);
 
+    /* This is the reason we've shifted from FILE* to char*, the whole torrent file now lives
+    inside the buffer with us, 'LOL' */
     BValue *info =
         dict_get(root, "info", 4);
 
@@ -53,6 +57,19 @@ Torrent *torrent_parse(BValue *root) {
         free(torrent);
         FAIL("Failed to fetch announce or info field");
     }
+
+    calculate_info_hash(info->encoded_begin, info->encoded_end,
+        torrent->info_hash);
+    
+    /* for debugging, remove later */
+    printf("Info Hash: ");
+
+    for (int i = 0; i < 20; i++)
+        printf("%02x", torrent->info_hash[i]);
+
+    printf("\n");
+
+    /* DELETE PLEASE */
 
     torrent->announce =
         copy_bstring(announce);
@@ -166,6 +183,25 @@ Torrent *torrent_parse(BValue *root) {
     return torrent;
 }
 
+
+void calculate_info_hash(const char* start,const char* end,
+    unsigned char digest[20]) {
+
+        if (!start || !end || end < start)
+            return;
+
+        size_t len = (size_t)(end - start);
+
+        SHA1_CTX ctx;
+
+        sha1_init(&ctx);
+        sha1_update(
+            &ctx,
+            (const unsigned char*)start,
+            len
+        );
+        sha1_final(&ctx, digest);
+}
 
 
 void torrent_print(const Torrent* torrent) {
