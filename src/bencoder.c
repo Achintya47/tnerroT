@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include "bencoder.h"
 
 /**
@@ -179,6 +180,8 @@ BValue* decode_value(Parser* in) {
     
     value->encoded_begin = start;
     value->encoded_end = in->data + in->pos;
+
+    return value;
 }
 
 /**
@@ -236,7 +239,20 @@ BValue* decode_string(Parser* in, int first_digit) {
         if (c < '0' || c > '9')
             return NULL;
 
+        /*
+        BUG FIX : Overflow protection — a crafted/corrupted length
+        prefix (e.g. a 20-digit number) would otherwise overflow
+        'length' and pass a garbage or huge size to malloc().
+        Reject anything that would exceed what the remaining buffer
+        could possibly hold.
+        */
+        if (length > (INT_MAX - 9) / 10)
+            return NULL;
+
         length = length * 10 + (c - '0');
+
+        if ((size_t)length > in->size - in->pos)
+            return NULL;
     }
 
     char* buffer = malloc(length);
@@ -323,6 +339,11 @@ BValue* decode_dict(Parser* in) {
             destroy_value(dict);
             return NULL;
         }
+
+        /* Consume the digit we just peeked at — decode_string expects
+           the first digit byte to already be off the stream (same
+           convention decode_value uses). */
+        c = parser_get(in);
 
         BValue* key =
             decode_string(in, c);
