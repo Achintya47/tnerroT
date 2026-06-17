@@ -59,7 +59,7 @@ typedef struct {
     uint64_t num_files;
 
     /* EXTRA ADDED PARAMETERS BY ME */
-
+    unsigned char info_hash[20];
     uint64_t num_pieces;
 
     /* OPTIONAL PARAMETERS */
@@ -93,6 +93,7 @@ typedef struct {
 Torrent* torrent_parse(BValue* root);
 void torrent_destroy(Torrent *torrent);
 void torrent_print(const Torrent* torrent);
+void calculate_info_hash(const char* start,const char* end, unsigned char digest[20]);
 
 
 #endif
