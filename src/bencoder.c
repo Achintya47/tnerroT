@@ -117,7 +117,33 @@ void encode_value(FILE* out, const BValue* value)
 }
 
 
+/* Helper struct : Parser */
+int parser_get(Parser* p) {
+    if (p->pos >= p->size)
+        return EOF;
+
+    return (unsigned char)p->data[p->pos++];
+}
+
+int parser_peek(Parser* p) {
+    if (p->pos >= p->size)
+        return EOF;
+
+    return (unsigned char)p->data[p->pos];
+}
+
+int parser_read(Parser* p, void* destination, size_t length) {
+    if (p->pos + length > p->size)
+        return 0;
+
+    memcpy(destination, p->data + p->pos, length);
+
+    p->pos += length;
+
+    return 1;
+}
 /* IMPLEMENTING DECODERS */
+
 
 
 /**
@@ -125,25 +151,34 @@ void encode_value(FILE* out, const BValue* value)
  * @param FILE stream pointer
  * @return BValue object : A wrapper for string, lists, dictionaries and integers
  */
-BValue* decode_value(FILE* in) {
-    int c = fgetc(in);
+BValue* decode_value(Parser* in) {
+
+    const char* start = in->data + in->pos;
+
+    int c = parser_get(in);
+
+    BValue* value = NULL;
 
     if (c == EOF)
         return NULL;
 
     if (c == 'i')
-        return decode_int(in);
+        value = decode_int(in);
 
     if (c == 'l')
-        return decode_list(in);
+        value = decode_list(in);
 
     if (c == 'd')
-        return decode_dict(in);
+        value = decode_dict(in);
 
     if (c >= '0' && c <= '9')
-        return decode_string(in, c);
+        value = decode_string(in, c);
 
-    return NULL;
+    if (!value)
+        return NULL;
+    
+    value->encoded_begin = start;
+    value->encoded_end = in->data + in->pos;
 }
 
 /**
@@ -151,13 +186,13 @@ BValue* decode_value(FILE* in) {
  * @param FILE stream pointer
  * @return BValue object
  */
-BValue* decode_int(FILE* in) {
+BValue* decode_int(Parser* in) {
     char buffer[32];
     int pos = 0;
 
     int c;
 
-    while ((c = fgetc(in)) != 'e')
+    while ((c = parser_get(in)) != 'e')
     {
         if (c == EOF)
             return NULL;
@@ -183,12 +218,12 @@ BValue* decode_int(FILE* in) {
  * @param FILE stream pointer
  * @return BValue object
  */
-BValue* decode_string(FILE* in, int first_digit) {
+BValue* decode_string(Parser* in, int first_digit) {
     int length = first_digit - '0';
 
     int c;
 
-    while ((c = fgetc(in)) != ':')
+    while ((c = parser_get(in)) != ':')
     {
         if (c == EOF)
             return NULL;
@@ -206,10 +241,13 @@ BValue* decode_string(FILE* in, int first_digit) {
 
     char* buffer = malloc(length);
 
+    if (!buffer)
+        return NULL;
+
     /*
     BUG FIX : File reading issue
     */
-    if (fread(buffer, 1, length, in) != (size_t)length) {
+    if (!parser_read(in, buffer, length)) {
         free(buffer);
         return NULL;
     }
@@ -227,23 +265,30 @@ BValue* decode_string(FILE* in, int first_digit) {
  * @param FILE stream pointer
  * @return BValue object
  */
-BValue* decode_list(FILE* in) {
+BValue* decode_list(Parser* in) {
     BValue* list = create_list();
 
     while (1)
     {
-        int c = fgetc(in);
+        int c = parser_peek(in);
 
-        if (c == EOF)
-            return NULL;
+        if (c == EOF) {
+            destroy_value(list);
+            return NULL;            
+        }
 
-        if (c == 'e')
+        if (c == 'e'){ 
+            parser_get(in);
             break;
-
-        ungetc(c, in);
+        }
 
         BValue* item =
             decode_value(in);
+        
+        if (!item) {
+            destroy_value(list);
+            return NULL;
+        }
 
         list_append(list, item);
     }
@@ -257,27 +302,44 @@ BValue* decode_list(FILE* in) {
  * @param FILE stream pointer
  * @return BValue object
  */
-BValue* decode_dict(FILE* in) {
+BValue* decode_dict(Parser* in) {
     BValue* dict = create_dict();
 
     while (1)
     {
-        int c = fgetc(in);
+        int c = parser_peek(in);
 
-        if (c == EOF)
+        if (c == EOF) {
+            destroy_value(dict);
             return NULL;
+        }
 
-        if (c == 'e')
+        if (c == 'e') {
+            parser_get(in); /* Consume 'e' */
             break;
+        }
 
-        if (!(c >= '0' && c <= '9'))
+        if (!(c >= '0' && c <= '9')) {
+            destroy_value(dict);
             return NULL;
+        }
 
         BValue* key =
             decode_string(in, c);
 
+        if (!key) {
+            destroy_value(dict);
+            return NULL;
+        }
+
         BValue* value =
             decode_value(in);
+        
+        if (!value) {
+            destroy_value(key);
+            destroy_value(dict);
+            return NULL;
+        }
 
         dict_insert(
             dict,

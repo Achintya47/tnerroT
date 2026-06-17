@@ -40,6 +40,10 @@ typedef enum {
 struct BValue {
     BType type;
 
+	/* For accessing info-dict for sha-1 hash calculation */
+	const char* encoded_begin;
+	const char* encoded_end;
+
     union {
         BInt integer;
 		BString string;
