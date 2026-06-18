@@ -204,6 +204,19 @@ void calculate_info_hash(const char* start,const char* end,
 }
 
 
+void torrent_destroy(Torrent *torrent) {
+    if (!torrent)
+        return;
+
+    free(torrent->announce);
+
+    free(torrent->name);
+
+    free(torrent->pieces);
+
+    free(torrent);
+}
+
 void torrent_print(const Torrent* torrent) {
     if (!torrent)
         return;
@@ -238,17 +251,4 @@ void torrent_print(const Torrent* torrent) {
     }
 
     printf("\n");   
-}
-
-void torrent_destroy(Torrent *torrent) {
-    if (!torrent)
-        return;
-
-    free(torrent->announce);
-
-    free(torrent->name);
-
-    free(torrent->pieces);
-
-    free(torrent);
 }
