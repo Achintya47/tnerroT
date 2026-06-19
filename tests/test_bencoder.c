@@ -2,10 +2,11 @@
  * @file    test_bencoder.c
  * @brief   Tests for the bencode encoder / decoder (bencoder.c + btypes.c).
  *
- * Strategy: for decoding we write a bencoded string into a tmpfile, run
- * decode_value() on it, and inspect the result. For encoding we go the other
- * way: build a BValue tree, encode it to a tmpfile, then read the raw bytes
- * back and compare them to the expected string.
+ * Strategy: decoding now reads directly from an in-memory buffer via a
+ * Parser struct, so we build a Parser over a literal bencoded string and run
+ * decode_value() on it. Encoding still writes to FILE*, so for encoding we
+ * build a BValue tree, encode it to a tmpfile, then read the raw bytes back
+ * and compare them to the expected string.
  */
 
 
@@ -18,14 +19,17 @@
 #include "test_utils.h"
  
 
-/* Write a literal string into a fresh tmpfile and rewind it. */
-static FILE* make_input(const char* s) {
-    FILE* f = tmpfile();
-    fputs(s, f);
-    rewind(f);
-    return f;
+/* Build a Parser over a literal bencoded string. The Parser only stores a
+   pointer into s, so s must stay alive for as long as the Parser is used
+   (string literals and the slurp()'d buffer below are both fine). */
+static Parser make_input(const char* s) {
+    Parser p;
+    p.data = s;
+    p.size = strlen(s);
+    p.pos = 0;
+    return p;
 }
- 
+
 /* Read everything from f (from current position) into a heap buffer.
    Caller must free(). Returns the number of bytes read via *out_len. */
 static char* slurp(FILE* f, int* out_len) {
@@ -45,28 +49,28 @@ static char* slurp(FILE* f, int* out_len) {
 static void test_decode_int(void) {
     SECTION("decode integer");
  
-    FILE* f;
+    Parser p;
     BValue* v;
  
-    f = make_input("i42e");
-    v = decode_value(f);
+    p = make_input("i42e");
+    v = decode_value(&p);
     CHECK("i42e -> 42",        v && v->type == BINT && v->value.integer.value == 42);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
-    f = make_input("i0e");
-    v = decode_value(f);
+    p = make_input("i0e");
+    v = decode_value(&p);
     CHECK("i0e -> 0",          v && v->type == BINT && v->value.integer.value == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
-    f = make_input("i-7e");
-    v = decode_value(f);
+    p = make_input("i-7e");
+    v = decode_value(&p);
     CHECK("i-7e -> -7",        v && v->type == BINT && v->value.integer.value == -7);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
-    f = make_input("i1000000e");
-    v = decode_value(f);
+    p = make_input("i1000000e");
+    v = decode_value(&p);
     CHECK("large positive",    v && v->type == BINT && v->value.integer.value == 1000000);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
 }
  
 static void test_encode_int(void) {
@@ -101,27 +105,27 @@ static void test_encode_int(void) {
 static void test_decode_string(void) {
     SECTION("decode string");
  
-    FILE* f;
+    Parser p;
     BValue* v;
  
-    f = make_input("4:spam");
-    v = decode_value(f);
+    p = make_input("4:spam");
+    v = decode_value(&p);
     CHECK("4:spam length",     v && v->type == BSTRING && v->value.string.length == 4);
     CHECK("4:spam data",       v && memcmp(v->value.string.data, "spam", 4) == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
     /* Empty string */
-    f = make_input("0:");
-    v = decode_value(f);
+    p = make_input("0:");
+    v = decode_value(&p);
     CHECK("0: length == 0",    v && v->type == BSTRING && v->value.string.length == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
     /* String with embedded spaces */
-    f = make_input("5:hello");
-    v = decode_value(f);
+    p = make_input("5:hello");
+    v = decode_value(&p);
     CHECK("5:hello length",    v && v->type == BSTRING && v->value.string.length == 5);
     CHECK("5:hello data",      v && memcmp(v->value.string.data, "hello", 5) == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
 }
  
 static void test_encode_string(void) {
@@ -149,36 +153,36 @@ static void test_encode_string(void) {
 static void test_decode_list(void) {
     SECTION("decode list");
  
-    FILE* f;
+    Parser p;
     BValue* v;
  
     /* l4:spam4:eggse */
-    f = make_input("l4:spam4:eggse");
-    v = decode_value(f);
+    p = make_input("l4:spam4:eggse");
+    v = decode_value(&p);
     CHECK("list type",       v && v->type == BLIST);
     CHECK("list count == 2", v && v->value.list.count == 2);
     BValue* item0 = list_get(v, 0);
     BValue* item1 = list_get(v, 1);
     CHECK("list[0] = spam",  item0 && memcmp(item0->value.string.data, "spam", 4) == 0);
     CHECK("list[1] = eggs",  item1 && memcmp(item1->value.string.data, "eggs", 4) == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
     /* Empty list */
-    f = make_input("le");
-    v = decode_value(f);
+    p = make_input("le");
+    v = decode_value(&p);
     CHECK("empty list count == 0", v && v->type == BLIST && v->value.list.count == 0);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
     /* Nested list: lli1eei2ee -> [[1], 2] */
-    f = make_input("lli1eei2ee");
-    v = decode_value(f);
+    p = make_input("lli1eei2ee");
+    v = decode_value(&p);
     CHECK("nested list type",        v && v->type == BLIST);
     CHECK("nested outer count == 2", v && v->value.list.count == 2);
     BValue* inner = list_get(v, 0);
     CHECK("inner is list",           inner && inner->type == BLIST);
     CHECK("inner[0] == 1",           list_get(inner, 0) && list_get(inner, 0)->value.integer.value == 1);
     CHECK("outer[1] == 2",           list_get(v, 1)     && list_get(v, 1)->value.integer.value == 2);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
 }
  
 static void test_encode_list(void) {
@@ -201,12 +205,12 @@ static void test_encode_list(void) {
 static void test_decode_dict(void) {
     SECTION("decode dict");
  
-    FILE* f;
+    Parser p;
     BValue* v;
  
     /* d3:cow3:moo4:spam4:eggse */
-    f = make_input("d3:cow3:moo4:spam4:eggse");
-    v = decode_value(f);
+    p = make_input("d3:cow3:moo4:spam4:eggse");
+    v = decode_value(&p);
     CHECK("dict type",       v && v->type == BDICT);
     CHECK("dict count == 2", v && v->value.dict.count == 2);
  
@@ -215,14 +219,14 @@ static void test_decode_dict(void) {
     CHECK("cow  -> moo",  cow  && memcmp(cow->value.string.data,  "moo",  3) == 0);
     CHECK("spam -> eggs", spam && memcmp(spam->value.string.data, "eggs", 4) == 0);
     CHECK("missing key returns NULL", dict_get(v, "nope", 4) == NULL);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
  
     /* Dict with integer value */
-    f = make_input("d6:lengthi1234ee");
-    v = decode_value(f);
+    p = make_input("d6:lengthi1234ee");
+    v = decode_value(&p);
     BValue* length = dict_get(v, "length", 6);
     CHECK("dict int value", length && length->value.integer.value == 1234);
-    destroy_value(v); fclose(f);
+    destroy_value(v);
 }
  
 static void test_encode_dict(void) {
@@ -255,9 +259,22 @@ static void test_roundtrip(void) {
  
     FILE* f = tmpfile();
     encode_value(f, original);
-    rewind(f);
-    BValue* decoded = decode_value(f);
+ 
+    int len;
+    char* buf = slurp(f, &len);
     fclose(f);
+ 
+    /* decode_value() now reads from an in-memory buffer rather than a
+       FILE*, so build a Parser directly over the encoded bytes. We size
+       it from len (not strlen) since bencoded data may legitimately
+       contain embedded NUL bytes. */
+    Parser p;
+    p.data = buf;
+    p.size = (size_t)len;
+    p.pos  = 0;
+ 
+    BValue* decoded = decode_value(&p);
+    free(buf);
  
     CHECK("round-trip type is dict",    decoded && decoded->type == BDICT);
  
