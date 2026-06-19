@@ -132,14 +132,14 @@ Torrent *torrent_parse(BValue *root) {
             for (int j = 0; j < path_list->count; j++) {
                 BValue* component = path_list->items[j];
 
-                tf->path[j] = strdup(component->value.string.data);
+                tf->path[j] = copy_bstring(component);
             }
 
             BValue* md5 =
                 dict_get(file_dict, "md5sum", 6);
 
             if (md5)
-                tf->md5sum = strdup(md5->value.string.data);
+                tf->md5sum = copy_bstring(md5);
 
         }
 
@@ -204,6 +204,19 @@ void calculate_info_hash(const char* start,const char* end,
 }
 
 
+void torrent_destroy(Torrent *torrent) {
+    if (!torrent)
+        return;
+
+    free(torrent->announce);
+
+    free(torrent->name);
+
+    free(torrent->pieces);
+
+    free(torrent);
+}
+
 void torrent_print(const Torrent* torrent) {
     if (!torrent)
         return;
@@ -238,17 +251,4 @@ void torrent_print(const Torrent* torrent) {
     }
 
     printf("\n");   
-}
-
-void torrent_destroy(Torrent *torrent) {
-    if (!torrent)
-        return;
-
-    free(torrent->announce);
-
-    free(torrent->name);
-
-    free(torrent->pieces);
-
-    free(torrent);
 }

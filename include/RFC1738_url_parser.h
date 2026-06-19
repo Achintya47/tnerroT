@@ -1,0 +1,1 @@
+void encode_info_hash(const unsigned char hash[20], char output[61]);
