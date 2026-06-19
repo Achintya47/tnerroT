@@ -155,14 +155,20 @@ static void test_piece_hashes(void) {
 static void test_multifile_length(void) {
     SECTION("multi-file torrent (files list)");
 
-    /* Build an info dict with a 'files' list instead of 'length' */
+    /* Build an info dict with a 'files' list instead of 'length'.
+       Per spec, each file's 'path' is itself a LIST of one or more
+       string components (e.g. ["dir", "file.txt"]), not a bare string. */
     BValue* file1 = create_dict();
     dict_insert(file1, "length", 6, create_int(100));
-    dict_insert(file1, "path",   4, create_string("a.txt", 5));
+    BValue* path1 = create_list();
+    list_append(path1, create_string("a.txt", 5));
+    dict_insert(file1, "path", 4, path1);
 
     BValue* file2 = create_dict();
     dict_insert(file2, "length", 6, create_int(200));
-    dict_insert(file2, "path",   4, create_string("b.txt", 5));
+    BValue* path2 = create_list();
+    list_append(path2, create_string("b.txt", 5));
+    dict_insert(file2, "path", 4, path2);
 
     BValue* files = create_list();
     list_append(files, file1);
@@ -183,6 +189,13 @@ static void test_multifile_length(void) {
     Torrent* t = torrent_parse(root);
     CHECK("multi-file parse succeeds",    t != NULL);
     CHECK("multi-file total length",      t && t->length == 300);
+    CHECK("multi-file num_files == 2",    t && t->num_files == 2);
+    CHECK("file[0] path[0] = a.txt",
+          t && t->files[0].path_count == 1 &&
+          strcmp(t->files[0].path[0], "a.txt") == 0);
+    CHECK("file[1] path[0] = b.txt",
+          t && t->files[1].path_count == 1 &&
+          strcmp(t->files[1].path[0], "b.txt") == 0);
 
     torrent_destroy(t);
     destroy_value(root);
@@ -227,6 +240,36 @@ static void test_bad_input(void) {
     CHECK("bad pieces length returns NULL", t == NULL);
     torrent_destroy(t);
     destroy_value(root);
+
+    /* Regression test: a multi-file entry whose 'path' is the WRONG
+       BValue type (a bare string instead of a list of components).
+       torrent_parse must validate the type and skip the entry rather
+       than reinterpreting the BString union fields as a BList header
+       (which previously caused a heap-buffer-overflow / segfault). */
+    BValue* bad_file = create_dict();
+    dict_insert(bad_file, "length", 6, create_int(100));
+    dict_insert(bad_file, "path",   4, create_string("a.txt", 5)); /* wrong type */
+
+    BValue* bad_files = create_list();
+    list_append(bad_files, bad_file);
+
+    char* one_piece = make_pieces(1, 0x11);
+    BValue* bad_info = create_dict();
+    dict_insert(bad_info, "name",         4,  create_string("bad", 3));
+    dict_insert(bad_info, "files",        5,  bad_files);
+    dict_insert(bad_info, "piece length", 12, create_int(512));
+    dict_insert(bad_info, "pieces",       6,  create_string(one_piece, 20));
+    free(one_piece);
+
+    BValue* bad_root = create_dict();
+    dict_insert(bad_root, "announce", 8, create_string("http://t.example.com", 20));
+    dict_insert(bad_root, "info",     4, bad_info);
+
+    t = torrent_parse(bad_root);
+    CHECK("wrong-type path doesn't crash, file skipped",
+          t != NULL && t->num_files == 1 && t->files[0].path_count == 0);
+    torrent_destroy(t);
+    destroy_value(bad_root);
 }
 
 /* Big Buck Bunny */

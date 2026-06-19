@@ -18,7 +18,7 @@
  *           not also be null terminated
  */
 static char* copy_bstring(BValue* str) {
-    if (!str)
+    if (!str || str->type != BSTRING)
         return NULL;
 
     char* copy = malloc(str->value.string.length + 1);
@@ -52,10 +52,11 @@ Torrent *torrent_parse(BValue *root) {
     BValue *info =
         dict_get(root, "info", 4);
 
-    if (!announce || !info)
+    if (!announce || announce->type != BSTRING ||
+        !info || info->type != BDICT)
     {
         free(torrent);
-        FAIL("Failed to fetch announce or info field");
+        FAIL("Failed to fetch announce or info field, or wrong type");
     }
 
     calculate_info_hash(info->encoded_begin, info->encoded_end,
@@ -89,16 +90,18 @@ Torrent *torrent_parse(BValue *root) {
     BValue *pieces =
         dict_get(info, "pieces", 6);
 
-    if (!name || !piece_length || !pieces) {
+    if (!name || name->type != BSTRING ||
+        !piece_length || piece_length->type != BINT ||
+        !pieces || pieces->type != BSTRING) {
         torrent_destroy(torrent);
-        FAIL("Failed to fetch name, length, piece_length or pieces field");
+        FAIL("Missing name, piece_length or pieces field, or wrong type");
     }
 
-    if (length) {
+    if (length && length->type == BINT) {
         torrent->length =
             length->value.integer.value;
     }
-    else if (files) {
+    else if (files && files->type == BLIST) {
 
         BList* list = &files->value.list;
 
@@ -110,13 +113,17 @@ Torrent *torrent_parse(BValue *root) {
         for (int i = 0; i < list->count; i++) {
             BValue* file_dict = list->items[i];
 
+            if (!file_dict || file_dict->type != BDICT)
+                continue;
+
             BValue* file_length =
                 dict_get(file_dict, "length", 6);
             
             BValue* path = 
                 dict_get(file_dict, "path", 4);
             
-            if (!file_length || !path)
+            if (!file_length || file_length->type != BINT ||
+                !path || path->type != BLIST)
                 continue;
 
             TorrentFile* tf = &torrent->files[i];
@@ -138,7 +145,7 @@ Torrent *torrent_parse(BValue *root) {
             BValue* md5 =
                 dict_get(file_dict, "md5sum", 6);
 
-            if (md5)
+            if (md5 && md5->type == BSTRING)
                 tf->md5sum = copy_bstring(md5);
 
         }
@@ -147,7 +154,7 @@ Torrent *torrent_parse(BValue *root) {
     }
     else {
         torrent_destroy(torrent);
-        FAIL("Neither length nor files present");
+        FAIL("Neither length nor files present, or wrong type");
     }
 
 
