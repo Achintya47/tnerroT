@@ -214,6 +214,35 @@ void torrent_destroy(Torrent *torrent) {
 
     free(torrent->pieces);
 
+    if (torrent->files) {
+
+        for (uint64_t i = 0; i < torrent->num_files; i++) {
+
+            TorrentFile* tf = &torrent->files[i];
+
+            if (tf->path) {
+
+                for (uint64_t j = 0; j < tf->path_count; j++)
+                    free(tf->path[j]);
+
+                free(tf->path);
+            }
+
+            /* free(NULL) is safe */
+            free(tf->md5sum);
+        }
+
+        free(torrent->files);
+    }
+
+    free(torrent->comment);
+    free(torrent->created_by);
+    free(torrent->encoding);
+
+    if (torrent->announce_list) {
+        /* free individual announce URLs when implemented */
+    }
+
     free(torrent);
 }
 
