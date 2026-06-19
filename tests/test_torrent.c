@@ -5,7 +5,8 @@
  * We build BValue trees that look like real .torrent dicts and feed them
  * straight to torrent_parse(), so we don't need to touch the filesystem for
  * most tests. The one exception is the "real file" test at the end, which
- * parses big-buck-bunny.torrent and checks a few known-good values.
+ * reads big-buck-bunny.torrent into memory, decodes it via the Parser-based
+ * decode_value(), and checks a few known-good values.
  */
 
 #include <stdio.h>
@@ -54,6 +55,38 @@ static BValue* make_root(const char* announce,
     dict_insert(root, "announce", 8, create_string(announce, (int)strlen(announce)));
     dict_insert(root, "info",     4, make_info(name, file_length, piece_length, num_pieces));
     return root;
+}
+
+/* Read a whole file into a heap buffer. Caller must free(). Returns NULL
+   on any failure (mirrors the read_file() used by the real torrent CLI). */
+static char* read_file(const char* path, size_t* size_out) {
+    FILE* fp = fopen(path, "rb");
+
+    if (!fp)
+        return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    char* buffer = malloc(size);
+
+    if (!buffer) {
+        fclose(fp);
+        return NULL;
+    }
+
+    if (fread(buffer, 1, size, fp) != (size_t)size) {
+        free(buffer);
+        fclose(fp);
+        return NULL;
+    }
+
+    fclose(fp);
+
+    *size_out = (size_t)size;
+
+    return buffer;
 }
 
 
@@ -201,14 +234,21 @@ static void test_bad_input(void) {
 static void test_real_torrent(const char* path) {
     SECTION("real file: big-buck-bunny.torrent");
 
-    FILE* fp = fopen(path, "rb");
-    if (!fp) {
+    size_t file_size;
+    char* buffer = read_file(path, &file_size);
+
+    if (!buffer) {
         printf("  [SKIP] could not open %s\n", path);
         return;
     }
 
-    BValue* root = decode_value(fp);
-    fclose(fp);
+    Parser parser = {
+        .data = buffer,
+        .size = file_size,
+        .pos  = 0
+    };
+
+    BValue* root = decode_value(&parser);
 
     CHECK("file decodes to dict", root && root->type == BDICT);
 
@@ -234,6 +274,7 @@ static void test_real_torrent(const char* path) {
 
     torrent_destroy(t);
     destroy_value(root);
+    free(buffer);
 }
 
 /* Main */
