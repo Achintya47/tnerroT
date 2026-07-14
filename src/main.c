@@ -4,6 +4,12 @@
 #include "btypes.h"
 #include "torrent.h"
 #include "bencoder.h"
+#include "tracker.h"
+
+#ifdef _WIN32
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#endif
 
 char* read_file(const char* path, size_t* size_out) {
     FILE* fp = fopen(path, "rb");
@@ -74,11 +80,36 @@ int main(int argc, char* argv[]) {
     }
 
 
-    /* since w're now testing info_hash cretion, this shall be removed */
-    // torrent_print(torrent);
+    torrent_print(torrent);
 
-    // connect_tracker(torrent);
-    
+    TrackerHTTPGetResponse* response = connect_tracker(torrent);
+
+    if (!response) {
+        fprintf(stderr, "Tracker announce failed\n");
+    }
+    else if (response->failure_reason) {
+        fprintf(stderr, "Tracker returned failure: %s\n", response->failure_reason);
+    }
+    else {
+        printf("Tracker OK: interval=%llu, seeders=%llu, leechers=%llu, peers=%llu\n",
+            (unsigned long long)response->interval,
+            (unsigned long long)response->complete,
+            (unsigned long long)response->incomplete,
+            (unsigned long long)response->num_peers);
+
+        for (uint64_t i = 0; i < response->num_peers; i++) {
+            struct in_addr addr;
+            addr.s_addr = response->peers[i].ip; /* already network order */
+
+            printf("  peer[%llu] %s:%u\n",
+                (unsigned long long)i,
+                inet_ntoa(addr),
+                ntohs(response->peers[i].port));
+        }
+    }
+
+    tracker_response_destroy(response);
+
     destroy_value(root);
 
     torrent_destroy(torrent);
