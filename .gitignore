@@ -9,3 +9,6 @@
 
 # Ignore build directory
 /build/
+
+# Ignore torrent files meant for testing
+*.torrent
