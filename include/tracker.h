@@ -9,10 +9,12 @@ typedef enum {
 } TrackerType;
 
 /* Compact peers only, common format for HTTP trackers and UDP Trackers */
+#pragma pack(push, 1)
 typedef struct {
     uint32_t ip;
     uint16_t port;
 } Peer;
+#pragma pack(pop)
 
 typedef struct {
 
@@ -126,3 +128,19 @@ typedef struct {
     Peer peers[];
 
 } TrackerUDPAnnounceResponse;
+
+
+/**
+ * @brief : Announces to an "http://" tracker for the given torrent and parses
+ *        its bencoded response.
+ * @param : torrent   Parsed torrent (needs announce + info_hash + length).
+ * @return : Heap-allocated TrackerHTTPGetResponse on success (free with
+ *         tracker_response_destroy), or NULL on network/parse failure.
+ * @note : Only http:// announce URLs are handled here; https or udp are not.
+ */
+TrackerHTTPGetResponse* connect_tracker(Torrent* torrent);
+
+/**
+ * @brief Frees a TrackerHTTPGetResponse and everything it owns.
+ */
+void tracker_response_destroy(TrackerHTTPGetResponse* resp);
