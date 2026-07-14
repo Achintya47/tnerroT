@@ -3,7 +3,8 @@
  *           parsed Torrent, sends it over a TCP socket (WinSock), and
  *           decodes the bencoded tracker response into a
  *           TrackerHTTPGetResponse.
- * @note    : UDP trackers (udp://) are not handled here yet.
+ *              http:// -> HTTP GET + bencoded response (BEP 3)
+ *              udp:// -> binary connect/announce datagram (BEP 15)
  */
 
 #include <WinSock2.h>
@@ -11,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "tracker.h"
 #include "torrent.h"
@@ -230,7 +232,7 @@ static int parse_tracker_dict(BValue* dict, TrackerHTTPGetResponse* out) {
     return 1;
 }
 
-TrackerHTTPGetResponse* connect_tracker(Torrent* torrent) {
+TrackerHTTPGetResponse* connect_tracker_http(Torrent* torrent) {
     if (!torrent || !torrent->announce)
         return NULL;
  
@@ -336,3 +338,19 @@ void tracker_response_destroy(TrackerHTTPGetResponse* resp) {
     free(resp->peers);
     free(resp);
 }
+
+
+/* ---------------------------------------------------------------------
+ * UDP tracker (BEP 15)
+ *
+ * Wire format is fixed-size and big-endian, so instead of trusting struct
+ * layout/padding we serialise by hand into plain byte buffers using the
+ * put_u.. / get_u.. helpers below - that keeps it correct regardless of
+ * struct alignment or host endianness, and is easy to check line-by-line
+ * against the BEP 15 offset tables.
+ * --------------------------------------------------------------------- */
+ 
+#define UDP_PROTOCOL_ID      0x41727101980ULL
+#define UDP_ACTION_CONNECT   0
+#define UDP_ACTION_ANNOUNCE  1
+#define UDP_ACTION_ERROR     3
