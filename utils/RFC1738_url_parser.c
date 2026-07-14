@@ -20,17 +20,15 @@ void encode_info_hash(const unsigned char hash[20],
 }
 
 /**
- * @brief : Splits "http://host[:port][/path]" into host / port / path.
- * @see : RFC1738_url_parser.h for full contract.
+ * @brief Splits "<scheme>host[:port][/path]" into host / port / path.
+ *        Shared by parse_announce_url() (http) and parse_udp_announce_url() (udp).
  */
-int parse_announce_url(const char* url, char** host_out,
-    unsigned short* port_out, char** path_out) {
+static int parse_url_generic(const char* url, const char* scheme,
+    char** host_out, unsigned short* port_out, char** path_out) {
 
-    if (!url || !host_out || !port_out || !path_out)
+    if (!url || !scheme || !host_out || !port_out)
         return 0;
 
-    /* Only http:// is supported here; https/udp are handled elsewhere */
-    const char* scheme = "http://";
     size_t scheme_len = strlen(scheme);
 
     if (strncmp(url, scheme, scheme_len) != 0)
@@ -74,22 +72,49 @@ int parse_announce_url(const char* url, char** host_out,
         port = (unsigned short)parsed_port;
     }
 
-    /* whatever remains is the path; default to "/" if none given */
-    const char* path_src = (*cursor == '/') ? cursor : "/";
-    size_t path_len = strlen(path_src);
-
-    char* path = malloc(path_len + 1);
-
-    if (!path) {
-        free(host);
-        return 0;
-    }
-
-    memcpy(path, path_src, path_len + 1); /* includes null terminator */
-
     *host_out = host;
     *port_out = port;
-    *path_out = path;
+
+    if (path_out) {
+        /* whatever remains is the path; default to "/" if none given */
+        const char* path_src = (*cursor == '/') ? cursor : "/";
+        size_t path_len = strlen(path_src);
+
+        char* path = malloc(path_len + 1);
+
+        if (!path) {
+            free(host);
+            return 0;
+        }
+
+        memcpy(path, path_src, path_len + 1); /* includes null terminator */
+        *path_out = path;
+    }
 
     return 1;
+}
+
+/**
+ * @brief Splits "http://host[:port][/path]" into host / port / path.
+ * @see RFC1738_url_parser.h for full contract.
+ */
+int parse_announce_url(const char* url, char** host_out,
+    unsigned short* port_out, char** path_out) {
+
+    if (!path_out)
+        return 0;
+
+    return parse_url_generic(url, "http://", host_out, port_out, path_out);
+}
+
+/**
+ * @brief Splits "udp://host:port[/anything]" into host / port.
+ *        UDP trackers (BEP 15) don't use a path, so unlike the http
+ *        variant there's nothing to hand back besides host and port.
+ * @see RFC1738_url_parser.h for full contract.
+ */
+int parse_udp_announce_url(const char* url, char** host_out,
+    unsigned short* port_out) {
+
+    return parse_url_generic(url, "udp://", host_out, port_out, NULL);
 }

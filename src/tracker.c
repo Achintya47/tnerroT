@@ -354,3 +354,310 @@ void tracker_response_destroy(TrackerHTTPGetResponse* resp) {
 #define UDP_ACTION_CONNECT   0
 #define UDP_ACTION_ANNOUNCE  1
 #define UDP_ACTION_ERROR     3
+#define UDP_TIMEOUT_BASE_SEC 15
+#define UDP_MAX_RETRIES      4
+
+static void put_u16(unsigned char* p, uint16_t v) {
+    p[0] = (unsigned char)(v >> 8);
+    p[1] = (unsigned char)(v);
+}
+ 
+static void put_u32(unsigned char* p, uint32_t v) {
+    p[0] = (unsigned char)(v >> 24);
+    p[1] = (unsigned char)(v >> 16);
+    p[2] = (unsigned char)(v >> 8);
+    p[3] = (unsigned char)(v);
+}
+ 
+static void put_u64(unsigned char* p, uint64_t v) {
+    put_u32(p,     (uint32_t)(v >> 32));
+    put_u32(p + 4, (uint32_t)(v & 0xFFFFFFFFu));
+}
+ 
+static uint32_t get_u32(const unsigned char* p) {
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16)
+         | ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+}
+ 
+static uint64_t get_u64(const unsigned char* p) {
+    return ((uint64_t)get_u32(p) << 32) | (uint64_t)get_u32(p + 4);
+}
+
+
+static uint32_t random_transaction_id(void) {
+    static int seeded = 0;
+ 
+    if (!seeded) {
+        srand((unsigned int)time(NULL));
+        seeded = 1;
+    }
+ 
+    /* rand() alone is often only 15 bits wide (RAND_MAX == 0x7FFF on
+       MSVC), so combine two calls to fill 32 bits */
+    return ((uint32_t)rand() << 16) ^ (uint32_t)rand();
+}
+ 
+static void set_recv_timeout(SOCKET sock, int seconds) {
+    DWORD timeout_ms = (DWORD)seconds * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout_ms, sizeof(timeout_ms));
+}
+ 
+/**
+ * @brief Opens a UDP socket "connected" to host:port.
+ * @note  connect() on a SOCK_DGRAM socket doesn't perform a handshake —
+ *        it just fixes the peer address so we can use send()/recv()
+ *        instead of sendto()/recvfrom(), and so stray packets from other
+ *        hosts are filtered out by the OS.
+ */
+static SOCKET udp_connect_socket(const char* host, unsigned short port) {
+    struct addrinfo hints;
+    struct addrinfo* result = NULL;
+    char port_str[6];
+ 
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
+ 
+    snprintf(port_str, sizeof(port_str), "%u", port);
+ 
+    if (getaddrinfo(host, port_str, &hints, &result) != 0)
+        return INVALID_SOCKET;
+ 
+    SOCKET sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+ 
+    if (sock == INVALID_SOCKET) {
+        freeaddrinfo(result);
+        return INVALID_SOCKET;
+    }
+ 
+    if (connect(sock, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
+        closesocket(sock);
+        freeaddrinfo(result);
+        return INVALID_SOCKET;
+    }
+ 
+    freeaddrinfo(result);
+    return sock;
+}
+ 
+/**
+ * @brief Connect handshake (BEP 15 "Connect"): obtains a connection_id,
+ *        retrying with the spec's backoff schedule on timeout.
+ * @return 1 on success (*connection_id_out set), 0 on timeout/error/
+ *         tracker-reported error (which is printed to stderr).
+ */
+static int udp_connect(SOCKET sock, uint64_t* connection_id_out) {
+    unsigned char req[16];
+    unsigned char resp[512];
+ 
+    put_u64(req,     UDP_PROTOCOL_ID);
+    put_u32(req + 8, UDP_ACTION_CONNECT);
+ 
+    uint32_t txn = random_transaction_id();
+    put_u32(req + 12, txn);
+ 
+    for (int n = 0; n <= UDP_MAX_RETRIES; n++) {
+        if (send(sock, (const char*)req, sizeof(req), 0) == SOCKET_ERROR)
+            return 0;
+ 
+        set_recv_timeout(sock, UDP_TIMEOUT_BASE_SEC * (1 << n));
+ 
+        int got = recv(sock, (char*)resp, sizeof(resp), 0);
+ 
+        if (got < 8)
+            continue; /* timed out, or too short to even read action+transaction_id */
+ 
+        if (get_u32(resp + 4) != txn)
+            continue; /* stray/mismatched packet; just retry */
+ 
+        uint32_t action = get_u32(resp);
+ 
+        if (action == UDP_ACTION_CONNECT && got >= 16) {
+            *connection_id_out = get_u64(resp + 8);
+            return 1;
+        }
+ 
+        if (action == UDP_ACTION_ERROR) {
+            int msg_len = got - 8;
+            fprintf(stderr, "connect_tracker: udp tracker error: %.*s\n",
+                msg_len > 0 ? msg_len : 0, (const char*)resp + 8);
+            return 0;
+        }
+    }
+ 
+    return 0;
+}
+ 
+/**
+ * @brief Announce (BEP 15 "Announce"): sends our stats, gets back
+ *        interval/seeder/leecher counts plus a compact peer list.
+ * @return 1 on success (*resp_len_out set, resp_buf holds the raw reply),
+ *         0 on timeout/error.
+ */
+static int udp_announce(SOCKET sock, uint64_t connection_id, Torrent* torrent,
+    unsigned char* resp_buf, size_t resp_buf_size, int* resp_len_out) {
+ 
+    unsigned char req[98];
+ 
+    put_u64(req,      connection_id);
+    put_u32(req + 8,  UDP_ACTION_ANNOUNCE);
+ 
+    uint32_t txn = random_transaction_id();
+    put_u32(req + 12, txn);
+ 
+    memcpy(req + 16, torrent->info_hash, 20);
+    memcpy(req + 36, PEER_ID, 20);
+ 
+    put_u64(req + 56, 0);                  /* downloaded */
+    put_u64(req + 64, torrent->length);    /* left */
+    put_u64(req + 72, 0);                  /* uploaded */
+    put_u32(req + 80, 0);                  /* event: 0 = none */
+    put_u32(req + 84, 0);                  /* IP address: 0 = let tracker decide */
+    put_u32(req + 88, 0);                  /* key: unused for now */
+    put_u32(req + 92, (uint32_t)-1);       /* num_want: -1 = default */
+    put_u16(req + 96, CLIENT_PORT);
+ 
+    for (int n = 0; n <= UDP_MAX_RETRIES; n++) {
+        if (send(sock, (const char*)req, sizeof(req), 0) == SOCKET_ERROR)
+            return 0;
+ 
+        set_recv_timeout(sock, UDP_TIMEOUT_BASE_SEC * (1 << n));
+ 
+        int got = recv(sock, (char*)resp_buf, (int)resp_buf_size, 0);
+ 
+        if (got < 8)
+            continue;
+ 
+        if (get_u32(resp_buf + 4) != txn)
+            continue;
+ 
+        uint32_t action = get_u32(resp_buf);
+ 
+        if (action == UDP_ACTION_ANNOUNCE && got >= 20) {
+            *resp_len_out = got;
+            return 1;
+        }
+ 
+        if (action == UDP_ACTION_ERROR) {
+            *resp_len_out = got;
+            return 1; /* caller checks the action byte to surface the message */
+        }
+    }
+ 
+    return 0;
+}
+ 
+static TrackerHTTPGetResponse* connect_tracker_udp(Torrent* torrent) {
+    char* host = NULL;
+    unsigned short port = 0;
+ 
+    if (!parse_udp_announce_url(torrent->announce, &host, &port)) {
+        fprintf(stderr, "connect_tracker: malformed udp announce URL: %s\n",
+            torrent->announce);
+        return NULL;
+    }
+ 
+    TrackerHTTPGetResponse* response = NULL;
+    SOCKET sock = INVALID_SOCKET;
+    int wsa_ready = 0;
+ 
+    if (!winsock_startup()) {
+        fprintf(stderr, "connect_tracker: WSAStartup failed\n");
+        goto cleanup;
+    }
+    wsa_ready = 1;
+ 
+    sock = udp_connect_socket(host, port);
+ 
+    if (sock == INVALID_SOCKET) {
+        fprintf(stderr, "connect_tracker: failed to reach udp tracker %s:%u\n", host, port);
+        goto cleanup;
+    }
+ 
+    uint64_t connection_id = 0;
+ 
+    if (!udp_connect(sock, &connection_id)) {
+        fprintf(stderr, "connect_tracker: udp connect handshake failed/timed out\n");
+        goto cleanup;
+    }
+ 
+    unsigned char resp_buf[2048]; /* 20-byte header + room for lots of 6-byte peers */
+    int resp_len = 0;
+ 
+    if (!udp_announce(sock, connection_id, torrent, resp_buf, sizeof(resp_buf), &resp_len)) {
+        fprintf(stderr, "connect_tracker: udp announce failed/timed out\n");
+        goto cleanup;
+    }
+ 
+    response = calloc(1, sizeof(TrackerHTTPGetResponse));
+ 
+    if (!response)
+        goto cleanup;
+ 
+    if (get_u32(resp_buf) == UDP_ACTION_ERROR) {
+        int msg_len = resp_len - 8;
+ 
+        if (msg_len > 0) {
+            response->failure_reason = malloc((size_t)msg_len + 1);
+ 
+            if (response->failure_reason) {
+                memcpy(response->failure_reason, resp_buf + 8, (size_t)msg_len);
+                response->failure_reason[msg_len] = '\0';
+            }
+        }
+ 
+        goto cleanup;
+    }
+ 
+    response->interval   = get_u32(resp_buf + 8);
+    response->incomplete  = get_u32(resp_buf + 12); /* leechers */
+    response->complete    = get_u32(resp_buf + 16); /* seeders */
+ 
+    int peer_bytes = resp_len - 20;
+    size_t count = (peer_bytes > 0) ? (size_t)peer_bytes / 6 : 0;
+ 
+    if (count > 0) {
+        response->peers = malloc(sizeof(Peer) * count);
+ 
+        if (response->peers) {
+            for (size_t i = 0; i < count; i++) {
+                const unsigned char* p = resp_buf + 20 + i * 6;
+ 
+                /* Keep IP/port in network byte order, same convention as
+                   the HTTP compact-peers path — callers use ntohl/ntohs. */
+                memcpy(&response->peers[i].ip,   p,     4);
+                memcpy(&response->peers[i].port, p + 4, 2);
+            }
+ 
+            response->num_peers = count;
+        }
+    }
+ 
+cleanup:
+    if (sock != INVALID_SOCKET)
+        closesocket(sock);
+ 
+    if (wsa_ready)
+        WSACleanup();
+ 
+    free(host);
+ 
+    return response;
+}
+ 
+
+TrackerHTTPGetResponse* connect_tracker(Torrent* torrent) {
+    if (!torrent || !torrent->announce)
+        return NULL;
+ 
+    if (strncmp(torrent->announce, "udp://", 6) == 0)
+        return connect_tracker_udp(torrent);
+ 
+    if (strncmp(torrent->announce, "http://", 7) == 0)
+        return connect_tracker_http(torrent);
+ 
+    fprintf(stderr, "connect_tracker: unsupported announce scheme: %s\n",
+        torrent->announce);
+    return NULL;
+}

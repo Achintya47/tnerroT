@@ -275,16 +275,16 @@ void torrent_print(const Torrent* torrent) {
            (unsigned long long)
            torrent->piece_length);
 
-    printf("Pieces       : %zu\n", torrent->num_pieces);
+    // printf("Pieces       : %zu\n", torrent->num_pieces);
 
-    for (size_t i = 0; i < torrent->num_pieces; i++) {
-        printf("Hash[%zu] : ", i);
+    // for (size_t i = 0; i < torrent->num_pieces; i++) {
+    //     printf("Hash[%zu] : ", i);
 
-        for (int j = 0; j < 20; j++)
-            printf("%02x", torrent->pieces[i].hash[j]);
+    //     for (int j = 0; j < 20; j++)
+    //         printf("%02x", torrent->pieces[i].hash[j]);
 
-        printf("\n");
-    }
+    //     printf("\n");
+    // }
 
     printf("\n");   
 }

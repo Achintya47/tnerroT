@@ -129,14 +129,16 @@ typedef struct {
 
 } TrackerUDPAnnounceResponse;
 
-
 /**
- * @brief : Announces to an "http://" tracker for the given torrent and parses
- *        its bencoded response.
- * @param : torrent   Parsed torrent (needs announce + info_hash + length).
- * @return : Heap-allocated TrackerHTTPGetResponse on success (free with
+ * @brief Announces to a tracker for the given torrent and returns a
+ *        normalized response, regardless of transport.
+ * @param torrent   Parsed torrent (needs announce + info_hash + length).
+ * @return Heap-allocated TrackerHTTPGetResponse on success (free with
  *         tracker_response_destroy), or NULL on network/parse failure.
- * @note : Only http:// announce URLs are handled here; https or udp are not.
+ * @note Dispatches on torrent->announce's scheme: "http://" uses a GET +
+ *       bencoded response (BEP 3); "udp://" uses the binary connect/
+ *       announce datagram protocol (BEP 15). Any other scheme (e.g.
+ *       "https://") is rejected.
  */
 TrackerHTTPGetResponse* connect_tracker(Torrent* torrent);
 
