@@ -27,7 +27,9 @@
 
 /* Hardcoded 20-Byte client-id/peer-id, Array size is exactly 20, the null
     terminator is not stored */
-static const unsigned char PEER_ID[20] = "-CB0001-000000000001";
+static const unsigned char PEER_ID[20] = {'-', 'C', 'B', '0', '0', '0', '1', '-', 
+                                          '0','0','0','0','0','0','0','0','0','0','0','1'};
+
 
 static int winsock_startup(void) {
     WSADATA wsa;
