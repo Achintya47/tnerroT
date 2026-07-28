@@ -42,7 +42,7 @@ jobs:
             src/torrent.c \
             src/tracker.c \
             utils/RFC1738_url_parser.c \
-            -lws2_32
+            -lws2_32 \
             -o tnerroT.exe
 
       # MAIN BINARY - SMOKE TEST
@@ -84,7 +84,7 @@ jobs:
             tests/test_torrent.c \
             src/tracker.c \
             utils/RFC1738_url_parser.c \
-            -lws2_32
+            -lws2_32 \ 
             -o test_torrent.exe
 
       - name: Run Torrent Tests
