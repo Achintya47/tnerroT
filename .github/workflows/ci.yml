@@ -1,4 +1,3 @@
-
 name: tnerroT CI
 
 on:
@@ -13,51 +12,78 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
-    strategy: 
-      fail-fast : false
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
       matrix:
         compiler:
           - gcc
-          - clang
-  
-    steps:
 
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Build Tools
+      - name: Show GCC Version
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential clang
+          gcc --version
 
-      - name: Build Project with warnings and sanitizers
+      - name: Build Project
+        shell: bash
         run: |
-          ${{ matrix.compiler }} \
+          gcc \
             -Wall -Wextra -Werror \
-            -fsanitize=address,undefined \
             -Iinclude \
             utils/sha1.c \
             src/bencoder.c \
             src/btypes.c \
             src/main.c \
             src/torrent.c \
-            -o tnerroT
-      
-        # MAIN BINARY - SMOKE TESTING
-      - name : Run a Torrnt parse
-        run: ./tnerroT big-buck-bunny.torrent
+            -lws2_32
+            -o tnerroT.exe
 
-        # BENCODER TESTS
-      - name : Build Bencoder Tests
-        run : gcc -Iinclude -Itests src/bencoder.c src/btypes.c tests/test_bencoder.c -o test_bencoder
+      # MAIN BINARY - SMOKE TEST
+      - name: Parse Torrent
+        shell: bash
+        run: |
+          ./tnerroT.exe big-buck-bunny.torrent
 
-      - name : Run Bencoder Tests
-        run : ./test_bencoder
+      # BENCODER TESTS
+      - name: Build Bencoder Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            src/bencoder.c \
+            src/btypes.c \
+            tests/test_bencoder.c \
+            -o test_bencoder.exe
 
-        # TORRENT PARSER TESTS
-      - name : Build Torrent Tests
-        run : gcc -Iinclude -Itests src/bencoder.c src/btypes.c src/torrent.c utils/sha1.c tests/test_torrent.c -o test_torrent
-      
-      - name : Run Torrent Tests
-        run : ./test_torrent big-buck-bunny.torrent
+      - name: Run Bencoder Tests
+        shell: bash
+        run: |
+          ./test_bencoder.exe
+
+      # TORRENT PARSER TESTS
+      - name: Build Torrent Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            src/bencoder.c \
+            src/btypes.c \
+            src/torrent.c \
+            utils/sha1.c \
+            tests/test_torrent.c \
+            -lws2_32
+            -o test_torrent.exe
+
+      - name: Run Torrent Tests
+        shell: bash
+        run: |
+          ./test_torrent.exe big-buck-bunny.torrent
