@@ -20,7 +20,7 @@
 #include "bencoder.h"
 #include "RFC1738_url_parser.h"
 
-#pragma comment(lib, "Ws2_32.lib")
+// #pragma comment(lib, "Ws2_32.lib")
 
 /* Hardcoded client Listening port (BitTorrent convention : 6881 - 6889) */
 #define CLIENT_PORT 6881
