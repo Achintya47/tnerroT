@@ -6,10 +6,7 @@ Thank you for helping keep **tnerroT** secure.
 
 Security updates are provided only for the latest version of the project available on the `main` branch.
 
-|     Version     | Supported |
-| :-------------: | :-------: |
-| Latest (`main`) |     ✅     |
-|  Older versions |     ❌     |
+Latest Version 'main' is supported
 
 ## Reporting a Vulnerability
 
