@@ -24,8 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "downloader.h"
 #include "peer.h"
+#include "downloader.h"
+
 #include "log.h"
 
 #ifdef _WIN32
