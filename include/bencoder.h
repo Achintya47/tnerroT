@@ -1,3 +1,6 @@
+#ifndef BENCODER_H
+#define BENCODER_H
+
 #include <stdio.h>
 #include "btypes.h"
 
@@ -23,3 +26,5 @@ BValue* decode_int(Parser* in);
 BValue* decode_string(Parser* in, int first_digit);
 BValue* decode_list(Parser* in);
 BValue* decode_dict(Parser* in);
+
+#endif
