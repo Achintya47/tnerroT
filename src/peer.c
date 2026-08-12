@@ -14,7 +14,7 @@
 #include "peer.h"
 #include "log.h"
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 #pragma comment(lib, "Ws2_32.lib")
 #endif
 
