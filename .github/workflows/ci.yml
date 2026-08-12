@@ -41,6 +41,11 @@ jobs:
             src/main.c \
             src/torrent.c \
             src/tracker.c \
+            src/peer.c \
+            src/downloader.c \
+            src/piece_manager.c \
+            src/file_writer.c \
+            src/log.c \
             utils/RFC1738_url_parser.c \
             -lws2_32 \
             -o tnerroT.exe
