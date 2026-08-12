@@ -50,11 +50,10 @@ jobs:
             -lws2_32 \
             -o tnerroT.exe
 
-      # MAIN BINARY - SMOKE TEST
-      - name: Parse Torrent
-        shell: bash
-        run: |
-          ./tnerroT.exe big-buck-bunny.torrent
+      # NOTE: no smoke-test run step here anymore. main.c now performs a
+      # real tracker announce + peer-wire download, which needs a live
+      # swarm/network that CI can't guarantee. We still build tnerroT.exe
+      # above so a broken compile/link fails CI, we just don't execute it.
 
       # BENCODER TESTS
       - name: Build Bencoder Tests
