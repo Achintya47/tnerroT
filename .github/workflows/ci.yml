@@ -94,4 +94,4 @@ jobs:
       - name: Run Torrent Tests
         shell: bash
         run: |
-          ./test_torrent.exe big-buck-bunny.torrent
+          ./test_torrent.exe
