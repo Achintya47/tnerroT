@@ -1,3 +1,6 @@
+#ifndef TRACKER_H
+#define TRACKER_H
+
 #include "torrent.h"
 
 /* This file will be containing all the message structs,
@@ -146,3 +149,5 @@ TrackerHTTPGetResponse* connect_tracker(Torrent* torrent);
  * @brief Frees a TrackerHTTPGetResponse and everything it owns.
  */
 void tracker_response_destroy(TrackerHTTPGetResponse* resp);
+
+#endif

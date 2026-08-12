@@ -1,3 +1,6 @@
+#ifndef RFC1738_URL_PARSER_H
+#define RFC1738_URL_PARSER_H
+
 void encode_info_hash(const unsigned char hash[20], char output[61]);
 
 /**
@@ -28,3 +31,5 @@ int parse_announce_url(const char* url, char** host_out,
  */
 int parse_udp_announce_url(const char* url, char** host_out,
     unsigned short* port_out);
+
+#endif
