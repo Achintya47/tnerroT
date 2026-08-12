@@ -19,12 +19,15 @@
  */
 BValue* create_int(long long value) {
 	/*
-	BUG FIX : malloc() left encoded_begin/encoded_end (only ever set by
-	decode_value() in bencoder.c) as uninitialized garbage for any BValue
-	built by hand instead of parsed from bencoded bytes. Callers like
-	torrent_parse() read those fields unconditionally via
-	calculate_info_hash(), so garbage pointers there caused
-	heap-out-of-bounds reads / segfaults. calloc() zero-initializes them.
+	BUG FIX : hand-crafted BValue objects have fields like encoded_begin and
+	encoded_end which need to also be properly initialized.
+	Inside the test_torrent.c, they're malloc'd and left un-initialized. For 0 or NULL
+	pointers, there are guards but random/garbage values aren't guarded, since Malloc doesn't 
+	zero the pointer values, accessing encoded->begin and encoded->end inside calculate_info_hash
+	causes a segmentation fault error. 
+
+	This error only occurs during test, when hand-crafted torrents are passed rather than parsing the actual
+	.torrent file.
 	*/
 	BValue* v = calloc(1, sizeof(BValue));
 	if (v == NULL) 
