@@ -18,7 +18,15 @@
  * @return : BValue* pointer to the object
  */
 BValue* create_int(long long value) {
-	BValue* v = malloc(sizeof(BValue));
+	/*
+	BUG FIX : malloc() left encoded_begin/encoded_end (only ever set by
+	decode_value() in bencoder.c) as uninitialized garbage for any BValue
+	built by hand instead of parsed from bencoded bytes. Callers like
+	torrent_parse() read those fields unconditionally via
+	calculate_info_hash(), so garbage pointers there caused
+	heap-out-of-bounds reads / segfaults. calloc() zero-initializes them.
+	*/
+	BValue* v = calloc(1, sizeof(BValue));
 	if (v == NULL) 
 		return NULL;
 	
@@ -34,7 +42,8 @@ BValue* create_int(long long value) {
  * @return : BValue* pointer to the object
  */
 BValue* create_string(const char* data, int length) {
-	BValue* v = malloc(sizeof(BValue));
+	/* BUG FIX : see create_int() — zero out encoded_begin/encoded_end */
+	BValue* v = calloc(1, sizeof(BValue));
 	if (v == NULL)
 		return NULL;
 
@@ -53,7 +62,8 @@ BValue* create_string(const char* data, int length) {
  * @return : BValue* pointer to the object
  */
 BValue* create_list(void) {
-	BValue* v = malloc(sizeof(BValue));
+	/* BUG FIX : see create_int() — zero out encoded_begin/encoded_end */
+	BValue* v = calloc(1, sizeof(BValue));
 	if (v == NULL)
 		return NULL;
 
@@ -73,7 +83,8 @@ BValue* create_list(void) {
  * @return : BValue* pointer to the object
  */
 BValue* create_dict(void) {
-	BValue* v = malloc(sizeof(BValue));
+	/* BUG FIX : see create_int() — zero out encoded_begin/encoded_end */
+	BValue* v = calloc(1, sizeof(BValue));
 	if (v == NULL)
 		return NULL;
 
@@ -234,4 +245,4 @@ void destroy_value(BValue* value) {
     }
 
     free(value);
-}	
+}
