@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "peer.h"
+#include "log.h"
 
 #ifdef _WIN32
 #pragma comment(lib, "Ws2_32.lib")
@@ -75,10 +76,14 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
     memset(pc, 0, sizeof(*pc));
     pc->sock = INVALID_SOCKET;
 
+    log_msg(LOG_DEBUG, ip, port, "connecting...");
+
     pc->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if (pc->sock == INVALID_SOCKET)
+    if (pc->sock == INVALID_SOCKET) {
+        log_msg(LOG_ERROR, ip, port, "socket() failed");
         return 0;
+    }
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -88,23 +93,19 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
     addr.sin_addr.s_addr = ip; /* already network byte order, from tracker */
 
 #ifdef _WIN32
-
-    // Make the socket non-blocking
     unsigned long mode = 1;
     ioctlsocket(pc->sock, FIONBIO, &mode); /* non-blocking, for the connect timeout */
 
     int rc = connect(pc->sock, (struct sockaddr*)&addr, sizeof(addr));
 
     if (rc == SOCKET_ERROR) {
-        // Connection has failed, WSAEWOULDBLOCK refers to unfinished connection
-        // Thus anything apart from that is a socket failure, thus close socket and move on
         if (WSAGetLastError() != WSAEWOULDBLOCK) {
+            log_msg(LOG_WARN, ip, port, "connect() failed immediately (refused/unreachable)");
             closesocket(pc->sock);
             pc->sock = INVALID_SOCKET;
             return 0;
         }
 
-        // Checking whether the socket is writable
         fd_set writefds;
         FD_ZERO(&writefds);
         FD_SET(pc->sock, &writefds);
@@ -113,11 +114,10 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
         tv.tv_sec  = 5;
         tv.tv_usec = 0;
 
-        // Wait until something happens at the socket for maximum 5 seconds
         rc = select(0, NULL, &writefds, NULL, &tv);
 
-        // Nothing happened
         if (rc <= 0) {
+            log_msg(LOG_WARN, ip, port, "connect() timed out after 5s");
             closesocket(pc->sock);
             pc->sock = INVALID_SOCKET;
             return 0; /* timed out or select error */
@@ -125,12 +125,10 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
 
         int err = 0;
         int errlen = sizeof(err);
-        // SO_ERROR -> 0 -> SUCCESS
-        //             non-zero -> CONNECTION FAILED
-
         getsockopt(pc->sock, SOL_SOCKET, SO_ERROR, (char*)&err, &errlen);
 
         if (err != 0) {
+            log_msg(LOG_WARN, ip, port, "connect() failed (SO_ERROR=%d)", err);
             closesocket(pc->sock);
             pc->sock = INVALID_SOCKET;
             return 0;
@@ -141,10 +139,10 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
        blocking send/recv, which keeps the single-peer logic easy to
        follow (one thread == one peer == one blocking loop). */
     mode = 0;
-    // Change the mode
     ioctlsocket(pc->sock, FIONBIO, &mode);
 #else
     if (connect(pc->sock, (struct sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+        log_msg(LOG_WARN, ip, port, "connect() failed");
         closesocket(pc->sock);
         pc->sock = INVALID_SOCKET;
         return 0;
@@ -160,6 +158,8 @@ int peer_connect(PeerConnection* pc, uint32_t ip, uint16_t port) {
     pc->am_interested  = 0;
     pc->peer_interested = 0;
 
+    log_msg(LOG_INFO, ip, port, "TCP connected");
+
     return 1;
 }
 
@@ -168,6 +168,7 @@ void peer_close(PeerConnection* pc) {
         return;
 
     if (pc->sock != INVALID_SOCKET) {
+        log_msg(LOG_DEBUG, pc->ip, pc->port, "closing connection");
         closesocket(pc->sock);
         pc->sock = INVALID_SOCKET;
     }
@@ -191,22 +192,52 @@ int peer_send_handshake(PeerConnection* pc, const unsigned char info_hash[INFO_H
     memcpy(pc->info_hash, info_hash, INFO_HASH_LEN);
     memcpy(pc->peer_id, peer_id, PEER_ID_LEN);
 
-    return send_all(pc->sock, buf, HANDSHAKE_LEN);
+    if (!send_all(pc->sock, buf, HANDSHAKE_LEN)) {
+        log_msg(LOG_WARN, pc->ip, pc->port, "failed to send handshake");
+        return 0;
+    }
+
+    log_msg(LOG_DEBUG, pc->ip, pc->port, "handshake sent");
+    return 1;
+}
+
+/* Peer IDs aren't guaranteed printable ASCII, so log them as hex rather
+   than risk garbage/control characters in the terminal. */
+static void hex_encode(const unsigned char* data, size_t len, char* out, size_t out_size) {
+    static const char hex[] = "0123456789abcdef";
+    size_t n = (len * 2 < out_size) ? len : (out_size - 1) / 2;
+
+    for (size_t i = 0; i < n; i++) {
+        out[i * 2]     = hex[(data[i] >> 4) & 0x0F];
+        out[i * 2 + 1] = hex[data[i] & 0x0F];
+    }
+
+    out[n * 2] = '\0';
 }
 
 int peer_recv_handshake(PeerConnection* pc, const unsigned char expected_info_hash[INFO_HASH_LEN]) {
     unsigned char buf[HANDSHAKE_LEN];
 
-    if (!recv_all(pc->sock, buf, HANDSHAKE_LEN))
+    if (!recv_all(pc->sock, buf, HANDSHAKE_LEN)) {
+        log_msg(LOG_WARN, pc->ip, pc->port, "connection closed before handshake reply arrived");
         return 0;
+    }
 
-    if (buf[0] != 19 || memcmp(buf + 1, "BitTorrent protocol", 19) != 0)
+    if (buf[0] != 19 || memcmp(buf + 1, "BitTorrent protocol", 19) != 0) {
+        log_msg(LOG_WARN, pc->ip, pc->port, "invalid handshake (unrecognised protocol string)");
         return 0;
+    }
 
-    if (memcmp(buf + 28, expected_info_hash, INFO_HASH_LEN) != 0)
+    if (memcmp(buf + 28, expected_info_hash, INFO_HASH_LEN) != 0) {
+        log_msg(LOG_WARN, pc->ip, pc->port, "handshake info_hash mismatch — wrong swarm, disconnecting");
         return 0; /* wrong torrent — talking to the wrong swarm */
+    }
 
     memcpy(pc->remote_peer_id, buf + 48, PEER_ID_LEN);
+
+    char id_hex[PEER_ID_LEN * 2 + 1];
+    hex_encode(pc->remote_peer_id, PEER_ID_LEN, id_hex, sizeof(id_hex));
+    log_msg(LOG_INFO, pc->ip, pc->port, "handshake OK, remote peer_id=%s", id_hex);
 
     return 1;
 }
