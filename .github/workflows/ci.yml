@@ -73,6 +73,28 @@ jobs:
         run: |
           ./test_bencoder.exe
 
+      # BTYPES TESTS
+      # Direct coverage of the BValue container itself — construction,
+      # list/dict capacity growth, accessor bounds checks (incl. the
+      # list_get(index == count) regression) and recursive destroy_value().
+      # Complements test_bencoder.c, which exercises btypes.c only
+      # indirectly through the decoder.
+      - name: Build Btypes Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            src/btypes.c \
+            tests/test_btypes.c \
+            -o test_btypes.exe
+
+      - name: Run Btypes Tests
+        shell: bash
+        run: |
+          ./test_btypes.exe
+
       # TORRENT PARSER TESTS
       - name: Build Torrent Tests
         shell: bash
@@ -95,3 +117,118 @@ jobs:
         shell: bash
         run: |
           ./test_torrent.exe
+
+      # SHA1 TESTS
+      # FIPS 180-4 / textbook known-answer vectors, the multi-block
+      # padding path, and streaming (sha1_update x N) vs one-shot
+      # (sha1_digest) equivalence.
+      - name: Build SHA1 Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            utils/sha1.c \
+            tests/test_sha1.c \
+            -o test_sha1.exe
+
+      - name: Run SHA1 Tests
+        shell: bash
+        run: |
+          ./test_sha1.exe
+
+      # RFC1738 URL PARSER TESTS
+      # Info-hash percent-encoding, and splitting http:// / udp:// announce
+      # URLs into host/port/path, including malformed/wrong-scheme input.
+      - name: Build RFC1738 URL Parser Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            utils/RFC1738_url_parser.c \
+            tests/test_rfc1738.c \
+            -o test_rfc1738.exe
+
+      - name: Run RFC1738 URL Parser Tests
+        shell: bash
+        run: |
+          ./test_rfc1738.exe
+
+      # PIECE MANAGER TESTS
+      # Compiled with -DBLOCK_SIZE=4 so a tiny, hand-computed torrent can
+      # exercise the multi-block path without needing megabytes of test
+      # data. Covers rarest-first selection, block storage, SHA1
+      # verification (both the success and corrupt-piece/re-download
+      # paths), and the completion counters. Builds a Torrent by hand
+      # rather than via torrent_parse(), so it links against torrent.c
+      # (for the PieceHash/Torrent layout) but not the bencoder.
+      - name: Build Piece Manager Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -DBLOCK_SIZE=4 \
+            -Iinclude \
+            -Itests \
+            src/piece_manager.c \
+            src/torrent.c \
+            src/btypes.c \
+            utils/sha1.c \
+            tests/test_piece_manager.c \
+            -o test_piece_manager.exe
+
+      - name: Run Piece Manager Tests
+        shell: bash
+        run: |
+          ./test_piece_manager.exe
+
+      # FILE WRITER TESTS
+      # Round-trips a hand-built single-file and multi-file (incl. nested
+      # subdirectory) Torrent through file_writer_save() into a temp
+      # directory and reads the results back to confirm byte-for-byte
+      # correctness and correct file layout.
+      - name: Build File Writer Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            src/file_writer.c \
+            src/torrent.c \
+            src/btypes.c \
+            utils/sha1.c \
+            tests/test_file_writer.c \
+            -o test_file_writer.exe
+
+      - name: Run File Writer Tests
+        shell: bash
+        run: |
+          ./test_file_writer.exe
+
+      # PEER BITFIELD TESTS
+      # Unit tests for the pure, socket-free parts of peer.c: bitfield
+      # allocation/replacement and single-bit set/query, including
+      # out-of-range indices from a hypothetical bad HAVE message.
+      # Deliberately doesn't touch peer_connect/handshake/etc., which need
+      # a live TCP peer and aren't unit-testable without a network double.
+      - name: Build Peer Bitfield Tests
+        shell: bash
+        run: |
+          gcc \
+            -Wall -Wextra -Werror \
+            -Iinclude \
+            -Itests \
+            src/peer.c \
+            src/log.c \
+            tests/test_peer_bitfield.c \
+            -lws2_32 \
+            -o test_peer_bitfield.exe
+
+      - name: Run Peer Bitfield Tests
+        shell: bash
+        run: |
+          ./test_peer_bitfield.exe
