@@ -9,7 +9,7 @@ ________________________________________________________________________________
    	   ____\//\\\\\___\/\\\___\/\\\__\//\\\\\\\\\\_\/\\\_________\/\\\__________\///\\\\\/_________\/\\\_______ 
         _____\/////____\///____\///____\//////////__\///__________\///_____________\/////___________\///________
 ```
-# tnerroT — Build Your Own BitTorrent Client in C
+# tnerroT — a BitTorrent Client in C
 
 A from-scratch, dependency-free implementation of the BitTorrent protocol in C: bencoding, `.torrent` parsing, HTTP/UDP tracker communication, the peer wire protocol, and a thread-per-peer concurrent downloader. No libtorrent, no libcurl, no third-party networking or crypto libraries — just raw sockets, threads, and the specs, built and explained one protocol layer at a time.
 
